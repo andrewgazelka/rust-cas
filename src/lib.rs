@@ -79,16 +79,43 @@ impl Equation {
     pub fn first_compile(input: &str) -> Result<Vec<EqBuild>, ParseError> {
         use EqOperator::*;
 
-        input.chars().filter(|&c| !c.is_whitespace())
-            .map(|c| match c {
-                '*' => Ok(EqBuild::Operator(Mul)),
-                '+' => Ok(EqBuild::Operator(Add)),
-                '-' => Ok(EqBuild::Operator(Sub)),
-                '/' => Ok(EqBuild::Operator(Div)),
-                '0'..='9' => Ok(EqBuild::Equation(Num(c as i32 - '0' as i32))),
-                _ => Err(UnexpectedOperator)
-            })
-            .collect()
+        let mut res = Vec::new();
+
+
+        let mut values = input.chars().filter(|&c| !c.is_whitespace());
+
+        let mut value_to_push = None;
+
+        while let Some(c) = values.next() {
+
+            if let Some(value) = value_to_push {
+                if !('0' ..= '9').contains(&c){
+                    res.push(EqBuild::Equation(Num(value)));
+                    value_to_push = None;
+                }
+            }
+
+            match c {
+                '*' => res.push(EqBuild::Operator(Mul)),
+                '+' => res.push(EqBuild::Operator(Add)),
+                '-' => res.push(EqBuild::Operator(Sub)),
+                '/' => res.push(EqBuild::Operator(Div)),
+                '0'..='9' => {
+                    let value = c as i32 - '0' as i32;
+                    match value_to_push.as_mut() {
+                        None => value_to_push = Some(value),
+                        Some(v) => *v = *v * 10 + value
+                    }
+                },
+                _ => return Err(UnexpectedOperator)
+            }
+        }
+
+        if let Some(v) = value_to_push {
+            res.push(EqBuild::Equation(Num(v)));
+        }
+
+        Ok(res)
     }
     pub fn parse(input: &str) -> Result<Equation, ParseError> {
         let mut chars = Self::first_compile(input)?;
@@ -163,6 +190,7 @@ mod tests {
         assert_eq!(CAS::solve("2+2*3").unwrap(), 8);
         assert_eq!(CAS::solve("2 - 2*3 + 5").unwrap(), 1);
         assert_eq!(CAS::solve("8/2/2").unwrap(), 2);
+        assert_eq!(CAS::solve("12/4/3").unwrap(), 1);
     }
 
     #[test]
