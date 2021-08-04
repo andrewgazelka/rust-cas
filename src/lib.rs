@@ -1,6 +1,17 @@
 #![feature(box_syntax)]
+#![feature(box_patterns)]
 
-#[derive(Clone)]
+#[macro_use]
+extern crate assert_matches;
+
+
+use std::collections::HashSet;
+
+use crate::EqBuild::Operator;
+use crate::Equation::Num;
+use crate::ParseError::{EmptyEq, UnexpectedOperator, UnmatchedOperator};
+
+#[derive(Debug, Clone)]
 enum Equation {
     Num(i32),
     Add(Box<Equation>, Box<Equation>),
@@ -9,7 +20,109 @@ enum Equation {
     Mul(Box<Equation>, Box<Equation>),
 }
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+enum EqOperator {
+    Mul,
+    Sub,
+    Div,
+    Add,
+}
+
+#[derive(Debug)]
+enum EqBuild {
+    Equation(Equation),
+    Operator(EqOperator),
+}
+
+#[derive(Debug)]
+enum ParseError {
+    UnmatchedOperator,
+    UnexpectedOperator,
+    EmptyEq,
+}
+
+fn parse_type(chars: &mut Vec<EqBuild>, to_match: &[EqOperator], combine: impl Fn(Equation, Equation, EqOperator) -> Equation) -> Result<(), ParseError> {
+    let mut i = 1;
+    while i < chars.len() - 1 {
+        let operator = &chars[i];
+        let mut change = false;
+        if let &Operator(operator) = operator {
+            if to_match.contains(&operator) {
+                let rhs = match chars.remove(i + 1) {
+                    EqBuild::Equation(eq) => eq,
+                    _ => return Err(UnmatchedOperator)
+                };
+
+                let lhs = match chars.remove(i - 1) {
+                    EqBuild::Equation(eq) => eq,
+                    _ => return Err(UnmatchedOperator)
+                };
+
+                let res = combine(lhs, rhs, operator);
+
+                chars[i - 1] = EqBuild::Equation(res);
+                change = true;
+            }
+        }
+
+        if !change {
+            i += 1;
+        }
+    }
+
+    Ok(())
+}
+
 impl Equation {
+    // fn parse_chars(input: &[char]) -> Result<Equation, ParseError> {}
+
+    pub fn first_compile(input: &str) -> Result<Vec<EqBuild>, ParseError> {
+        use EqOperator::*;
+
+        input.chars().filter(|&c| !c.is_whitespace())
+            .map(|c| match c {
+                '*' => Ok(EqBuild::Operator(Mul)),
+                '+' => Ok(EqBuild::Operator(Add)),
+                '-' => Ok(EqBuild::Operator(Sub)),
+                '/' => Ok(EqBuild::Operator(Div)),
+                '0'..='9' => Ok(EqBuild::Equation(Num(c as i32 - '0' as i32))),
+                _ => Err(UnexpectedOperator)
+            })
+            .collect()
+    }
+    pub fn parse(input: &str) -> Result<Equation, ParseError> {
+        let mut chars = Self::first_compile(input)?;
+
+        if chars.is_empty() {
+            return Err(EmptyEq);
+        }
+
+        // 2 * 2 / 2 * 2
+
+        parse_type(&mut chars, &[EqOperator::Mul, EqOperator::Div], |lhs, rhs, op| {
+            match op {
+                EqOperator::Mul => Equation::Mul(box lhs, box rhs),
+                EqOperator::Div => Equation::Div(box lhs, box rhs),
+                _ => panic!("logic error")
+            }
+        })?;
+
+        parse_type(&mut chars, &[EqOperator::Add, EqOperator::Sub], |lhs, rhs, op| {
+            match op {
+                EqOperator::Add => Equation::Add(box lhs, box rhs),
+                EqOperator::Sub => Equation::Sub(box lhs, box rhs),
+                _ => panic!("logic error")
+            }
+        })?;
+
+        debug_assert_eq!(chars.len(), 1);
+
+        match chars.pop().unwrap() {
+            EqBuild::Equation(eq) => Ok(eq),
+            _ => panic!("logic error")
+        }
+    }
+
     fn solve(self) -> i32 {
         match self {
             Equation::Num(val) => val,
@@ -21,12 +134,39 @@ impl Equation {
     }
 }
 
+
+/// Helper
+struct CAS;
+
+impl CAS {
+    fn solve(input: &str) -> Result<i32, ParseError> {
+        let equation = Equation::parse(input)?;
+        Ok(equation.solve())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::{CAS, Equation};
+
     use super::Equation::*;
 
     #[test]
-    fn test_eq() {
+    fn test_parse() {
+        assert_matches!(Equation::parse("2+2").unwrap(),Add(box Num(2), box Num(2)));
+        assert_matches!(Equation::parse("3*2+2").unwrap(),Add(box Mul(box Num(3), box Num(2)), box Num(2)));
+    }
+
+    #[test]
+    fn test_cas() {
+        assert_eq!(CAS::solve("2+2").unwrap(), 4);
+        assert_eq!(CAS::solve("2+2*3").unwrap(), 8);
+        assert_eq!(CAS::solve("2 - 2*3 + 5").unwrap(), 1);
+        assert_eq!(CAS::solve("8/2/2").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_equation_eq() {
         // (2 + 2) / 4
         let eq = Div(box Add(box Num(2), box Num(2)), box Num(4));
         assert_eq!(1, eq.clone().solve());
