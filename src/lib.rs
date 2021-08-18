@@ -4,9 +4,6 @@
 #[macro_use]
 extern crate assert_matches;
 
-
-use std::collections::HashSet;
-
 use crate::EqBuild::Operator;
 use crate::Equation::Num;
 use crate::ParseError::{EmptyEq, UnexpectedOperator, UnmatchedOperator};
@@ -87,9 +84,8 @@ impl Equation {
         let mut value_to_push = None;
 
         while let Some(c) = values.next() {
-
             if let Some(value) = value_to_push {
-                if !('0' ..= '9').contains(&c){
+                if !('0'..='9').contains(&c) {
                     res.push(EqBuild::Equation(Num(value)));
                     value_to_push = None;
                 }
@@ -106,7 +102,7 @@ impl Equation {
                         None => value_to_push = Some(value),
                         Some(v) => *v = *v * 10 + value
                     }
-                },
+                }
                 _ => return Err(UnexpectedOperator)
             }
         }
@@ -182,6 +178,7 @@ mod tests {
     fn test_parse() {
         assert_matches!(Equation::parse("2+2").unwrap(),Add(box Num(2), box Num(2)));
         assert_matches!(Equation::parse("3*2+2").unwrap(),Add(box Mul(box Num(3), box Num(2)), box Num(2)));
+        assert_matches!(Equation::parse("3*2-2").unwrap(),Sub(box Mul(box Num(3), box Num(2)), box Num(2)));
     }
 
     #[test]
@@ -191,6 +188,7 @@ mod tests {
         assert_eq!(CAS::solve("2 - 2*3 + 5").unwrap(), 1);
         assert_eq!(CAS::solve("8/2/2").unwrap(), 2);
         assert_eq!(CAS::solve("12/4/3").unwrap(), 1);
+        assert_eq!(CAS::solve("2+3+5-3-2*5").unwrap(), -3);
     }
 
     #[test]
