@@ -79,11 +79,11 @@ impl Equation {
         let mut res = Vec::new();
 
 
-        let mut values = input.chars().filter(|&c| !c.is_whitespace());
+        let values = input.chars().filter(|&c| !c.is_whitespace());
 
         let mut value_to_push = None;
 
-        while let Some(c) = values.next() {
+        for c in values {
             if let Some(value) = value_to_push {
                 if !('0'..='9').contains(&c) {
                     res.push(EqBuild::Equation(Num(value)));
@@ -159,9 +159,9 @@ impl Equation {
 
 
 /// Helper
-struct CAS;
+struct Cas;
 
-impl CAS {
+impl Cas {
     fn solve(input: &str) -> Result<i32, ParseError> {
         let equation = Equation::parse(input)?;
         Ok(equation.solve())
@@ -170,7 +170,7 @@ impl CAS {
 
 #[cfg(test)]
 mod tests {
-    use crate::{CAS, Equation};
+    use crate::{Cas, Equation};
 
     use super::Equation::*;
 
@@ -183,12 +183,12 @@ mod tests {
 
     #[test]
     fn test_cas() {
-        assert_eq!(CAS::solve("2+2").unwrap(), 4);
-        assert_eq!(CAS::solve("2+2*3").unwrap(), 8);
-        assert_eq!(CAS::solve("2 - 2*3 + 5").unwrap(), 1);
-        assert_eq!(CAS::solve("8/2/2").unwrap(), 2);
-        assert_eq!(CAS::solve("12/4/3").unwrap(), 1);
-        assert_eq!(CAS::solve("2+3+5-3-2*5").unwrap(), -3);
+        assert_eq!(Cas::solve("2+2").unwrap(), 4);
+        assert_eq!(Cas::solve("2+2*3").unwrap(), 8);
+        assert_eq!(Cas::solve("2 - 2*3 + 5").unwrap(), 1);
+        assert_eq!(Cas::solve("8/2/2").unwrap(), 2);
+        assert_eq!(Cas::solve("12/4/3").unwrap(), 1);
+        assert_eq!(Cas::solve("2+3+5-3-2*5").unwrap(), -3);
     }
 
     #[test]
